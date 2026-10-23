@@ -1,0 +1,6 @@
+{
+  "name": "CivilEdge IAS • DrishtiNova",
+  "description": "UPSC CSE Live Broadcasting & Class Hub with multi-source streaming, class scheduling, syllabus mapping, and complete codebase zip export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
