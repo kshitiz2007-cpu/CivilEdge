@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   initialBroadcastClasses,
   initialDoubts,
@@ -17,14 +17,9 @@ import {
   Download,
   FolderArchive,
   BookOpen,
-  FileText,
   Search,
   CheckCircle2,
-  Calendar,
-  Sparkles,
-  ExternalLink,
   ShieldCheck,
-  Video
 } from 'lucide-react';
 
 export default function App() {
@@ -33,36 +28,65 @@ export default function App() {
     initialBroadcastClasses.find((b) => b.status === 'live')?.id || initialBroadcastClasses[0].id
   );
   const [activeTab, setActiveTab] = useState<'classroom' | 'timetable' | 'handouts'>('classroom');
-
-  // Modals state
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBroadcast, setEditingBroadcast] = useState<BroadcastClass>(
     broadcasts.find((b) => b.id === activeBroadcastId) || broadcasts[0]
   );
-
-  // Doubts and Notes state
   const [doubts, setDoubts] = useState<LectureDoubt[]>(initialDoubts);
   const [notes, setNotes] = useState<LectureNote[]>(initialNotes);
   const [handoutSearch, setHandoutSearch] = useState('');
-
-  // Toast notifications
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isDataReady, setIsDataReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadAppData = async () => {
+      try {
+        const response = await fetch('/api/app-data');
+        if (!response.ok) throw new Error('Failed to load data');
+        const payload = await response.json();
+
+        if (!mounted) return;
+
+        if (payload.broadcasts?.length) setBroadcasts(payload.broadcasts);
+        if (payload.doubts?.length) setDoubts(payload.doubts);
+        if (payload.notes?.length) setNotes(payload.notes);
+        if (payload.handouts?.length) setActiveTab('classroom');
+      } catch (error) {
+        console.warn('Using mock data fallback:', error);
+      } finally {
+        if (mounted) {
+          setIsDataReady(true);
+        }
+      }
+    };
+
+    loadAppData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const active = broadcasts.find((b) => b.id === activeBroadcastId) || broadcasts[0];
+    if (active) {
+      setEditingBroadcast(active);
+    }
+  }, [broadcasts, activeBroadcastId]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const activeBroadcast =
-    broadcasts.find((b) => b.id === activeBroadcastId) || broadcasts[0];
-
+  const activeBroadcast = broadcasts.find((b) => b.id === activeBroadcastId) || broadcasts[0];
   const liveBroadcast = broadcasts.find((b) => b.status === 'live');
 
-  // Handler for adding a new scheduled class
   const handleScheduleNewClass = (newClass: BroadcastClass) => {
-    setBroadcasts([newClass, ...broadcasts]);
+    setBroadcasts((prev) => [newClass, ...prev]);
     if (newClass.status === 'live') {
       setActiveBroadcastId(newClass.id);
       setActiveTab('classroom');
@@ -70,19 +94,16 @@ export default function App() {
     showToast(`Scheduled: "${newClass.title.slice(0, 35)}..."`);
   };
 
-  // Handler for updating class details & source
   const handleUpdateClassDetails = (updated: BroadcastClass) => {
     setBroadcasts((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
     showToast(`Updated broadcast details for "${updated.title.slice(0, 30)}..."`);
   };
 
-  // Handler for opening edit modal for specific broadcast
   const handleOpenEditFor = (broadcast: BroadcastClass) => {
     setEditingBroadcast(broadcast);
     setIsEditModalOpen(true);
   };
 
-  // Live Doubt addition
   const handleAddDoubt = (text: string) => {
     const newDoubt: LectureDoubt = {
       id: `doubt-${Date.now()}`,
@@ -92,13 +113,13 @@ export default function App() {
       upvotes: 1,
       isAnswered: false,
       timeAgo: 'Just now',
-      userUpvoted: true
+      userUpvoted: true,
+      createdAt: new Date().toISOString(),
     };
-    setDoubts([newDoubt, ...doubts]);
+    setDoubts((prev) => [newDoubt, ...prev]);
     showToast('Your doubt was posted to the faculty stream!');
   };
 
-  // Upvote Doubt
   const handleUpvoteDoubt = (doubtId: string) => {
     setDoubts((prev) =>
       prev.map((d) => {
@@ -107,7 +128,7 @@ export default function App() {
           return {
             ...d,
             upvotes: upvoted ? d.upvotes - 1 : d.upvotes + 1,
-            userUpvoted: !upvoted
+            userUpvoted: !upvoted,
           };
         }
         return d;
@@ -115,22 +136,20 @@ export default function App() {
     );
   };
 
-  // Save Timestamped Note
   const handleAddNote = (timestampSecs: number, formattedTime: string, text: string) => {
     const newNote: LectureNote = {
       id: `note-${Date.now()}`,
       timestampSeconds: timestampSecs,
       formattedTime,
       text,
-      createdAt: 'Just now'
+      createdAt: new Date().toISOString(),
     };
-    setNotes([newNote, ...notes]);
+    setNotes((prev) => [newNote, ...prev]);
     showToast(`Note saved at @${formattedTime}`);
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-rose-500 selection:text-white">
-      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl text-xs font-bold text-white flex items-center gap-2 ring-1 ring-white/10">
@@ -140,7 +159,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Header */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -153,9 +171,7 @@ export default function App() {
         }}
       />
 
-      {/* Main Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
-        {/* TAB 1: LIVE CLASSROOM */}
         {activeTab === 'classroom' && (
           <ClassroomPlayer
             broadcasts={broadcasts}
@@ -171,7 +187,6 @@ export default function App() {
           />
         )}
 
-        {/* TAB 2: TIMETABLE & SCHEDULE */}
         {activeTab === 'timetable' && (
           <TimetableSection
             broadcasts={broadcasts}
@@ -184,7 +199,6 @@ export default function App() {
           />
         )}
 
-        {/* TAB 3: LECTURE CRUX HANDOUTS */}
         {activeTab === 'handouts' && (
           <div className="space-y-6">
             <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -201,7 +215,6 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Handout Search */}
               <div className="relative w-full md:w-72">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
@@ -214,7 +227,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Handouts Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {initialHandouts
                 .filter(
@@ -273,7 +285,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Floating Bottom Quick Bar: Download Code Banner */}
       <div className="border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-md py-3 px-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2.5 text-slate-400">
@@ -285,7 +296,7 @@ export default function App() {
 
           <button
             onClick={() => setIsDownloadModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700 font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700 font-bold transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-slate-900/25"
           >
             <FolderArchive className="w-4 h-4 text-rose-400" />
             <span>Download Whole Code as .ZIP ({sourceCodeManifest.length} files)</span>
@@ -293,7 +304,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Modals */}
       <DownloadCodeModal
         isOpen={isDownloadModalOpen}
         onClose={() => setIsDownloadModalOpen(false)}

@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubjectCode {
+  GS_1 @map("GS-1")
+  GS_2 @map("GS-2")
+  GS_3 @map("GS-3")
+  GS_4 @map("GS-4")
+  CSAT
+  CURRENT_AFFAIRS @map("Current Affairs")
+  ESSAY
+  OPTIONAL
+}
+
+enum BroadcastSource {
+  YOUTUBE
+  MEET
+  ZOOM
+  HLS
+  VIMEO
+  CUSTOM
+}
+
+enum BroadcastStatus {
+  LIVE
+  SCHEDULED
+  COMPLETED
+}
+
+enum UserRole {
+  STUDENT
+  FACULTY
+  ADMIN
+}
+
+model Subject {
+  code        SubjectCode @id
+  label       String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  broadcasts  Broadcast[]
+  handouts    ClassHandout[]
+
+  @@map("subjects")
+}
+
+model FacultyProfile {
+  id          String   @id @default(uuid())
+  name        String
+  designation String?
+  bio         String?
+  avatarUrl   String?  @map("avatar_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  broadcasts  Broadcast[]
+
+  @@map("faculty_profiles")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  role      UserRole @default(STUDENT)
+  avatarUrl String?  @map("avatar_url")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  @@map("users")
+}
+
+model Broadcast {
+  id                 String          @id @default(uuid())
+  title              String
+  subject            SubjectCode
+  facultyId          String          @map("faculty_id")
+  facultyName        String          @map("faculty_name")
+  facultyDesignation String?         @map("faculty_designation")
+  source             BroadcastSource
+  streamUrl          String          @map("stream_url")
+  scheduledDate      String          @map("scheduled_date")
+  scheduledTime      String          @map("scheduled_time")
+  durationMinutes    Int             @default(90) @map("duration_minutes")
+  status             BroadcastStatus @default(SCHEDULED)
+  description        String?
+  meetingId          String?         @map("meeting_id")
+  meetingPassword    String?         @map("meeting_password")
+  handoutTitle       String?         @map("handout_title")
+  handoutUrl         String?         @map("handout_url")
+  thumbnailUrl       String?         @map("thumbnail_url")
+  viewersCount       Int             @default(0) @map("viewers_count")
+  chatEnabled        Boolean         @default(true) @map("chat_enabled")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  facultyProfile     FacultyProfile  @relation(fields: [facultyId], references: [id])
+  topics             BroadcastTopic[]
+  doubts             LectureDoubt[]
+  notes              LectureNote[]
+
+  @@map("broadcasts")
+}
+
+model BroadcastTopic {
+  id          String   @id @default(uuid())
+  broadcastId String   @map("broadcast_id")
+  topic       String
+  createdAt   DateTime @default(now()) @map("created_at")
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, topic])
+  @@map("broadcast_topics")
+}
+
+model LectureDoubt {
+  id          String    @id @default(uuid())
+  broadcastId String?   @map("broadcast_id")
+  userName    String    @map("user_name")
+  avatarUrl   String?   @map("avatar_url")
+  query       String
+  upvotes     Int       @default(0)
+  isAnswered  Boolean   @default(false) @map("is_answered")
+  facultyReply String?   @map("faculty_reply")
+  userUpvoted Boolean   @default(false) @map("user_upvoted")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  broadcast   Broadcast? @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+
+  @@map("lecture_doubts")
+}
+
+model LectureNote {
+  id               String    @id @default(uuid())
+  broadcastId      String?   @map("broadcast_id")
+  timestampSeconds Int       @map("timestamp_seconds")
+  formattedTime    String    @map("formatted_time")
+  text             String
+  createdAt        DateTime  @default(now()) @map("created_at")
+  broadcast        Broadcast? @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@map("lecture_notes")
+}
+
+model ClassHandout {
+  id          String     @id @default(uuid())
+  title       String
+  subject     SubjectCode
+  pages       Int
+  size        String
+  downloadUrl String?    @map("download_url")
+  author      String
+  summary     String
+  createdAt   DateTime   @default(now()) @map("created_at")
+  subjectRef  Subject    @relation(fields: [subject], references: [code])
+
+  @@map("class_handouts")
+}
+
+model HandoutTopic {
+  id          String       @id @default(uuid())
+  handoutId   String       @map("handout_id")
+  topic       String
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@unique([handoutId, topic])
+  @@map("handout_topics")
+}

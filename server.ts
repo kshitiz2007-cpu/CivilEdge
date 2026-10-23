@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import JSZip from 'jszip';
+import { defaultAppData } from './src/lib/dataRepository';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,16 +11,48 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT) || 3000;
 
-// Health check endpoint
+app.use(express.json());
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'CivilEdge IAS • DrishtiNova',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    database: 'ready-for-prisma-or-postgres-connection',
   });
 });
 
-// Helper to recursively collect files for zip
+app.get('/api/app-data', (_, res) => {
+  res.json(defaultAppData);
+});
+
+app.get('/api/broadcasts', (_, res) => {
+  res.json(defaultAppData.broadcasts);
+});
+
+app.get('/api/doubts', (_, res) => {
+  res.json(defaultAppData.doubts);
+});
+
+app.get('/api/notes', (_, res) => {
+  res.json(defaultAppData.notes);
+});
+
+app.get('/api/handouts', (_, res) => {
+  res.json(defaultAppData.handouts);
+});
+
 function collectFiles(dirPath: string, rootDir: string, fileList: { path: string; fullPath: string }[] = []) {
   const items = fs.readdirSync(dirPath);
   for (const item of items) {
@@ -46,7 +79,6 @@ function collectFiles(dirPath: string, rootDir: string, fileList: { path: string
   return fileList;
 }
 
-// ZIP archive download endpoint
 app.get('/api/download-zip', async (req, res) => {
   try {
     const rootDir = __dirname;
@@ -75,7 +107,6 @@ app.get('/api/download-zip', async (req, res) => {
   }
 });
 
-// Static assets serving
 const distPath = path.resolve(__dirname, 'dist');
 const publicPath = path.resolve(__dirname, 'public');
 
